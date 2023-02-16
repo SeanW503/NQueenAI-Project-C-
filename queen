@@ -1,0 +1,246 @@
+#include<iostream>
+#include<cmath>
+#include<cstdlib>
+#include<algorithm>
+#include<sstream>
+#include<cstring>
+#include<map>
+#include<list>
+#include<queue>
+#include<ctime>
+
+using namespace std;
+int fitnessValue(string arrangement);
+
+class Solution {
+public:
+    string arrangement;
+    int cost;
+    int fitScore; 
+    int prob;
+    int chessBoardSize;
+
+    Solution(string arr): arrangement(arr) {
+        cost = fitnessValue(arrangement);
+    }
+
+    Solution* reproduce(Solution* y) {
+        Solution* child = new Solution("");
+        int n = chessBoardSize;
+        int c = rand() % n;
+        child->arrangement = (arrangement).substr(0, c) + (y->arrangement).substr(c, n - c);
+        child->cost = fitnessValue(child->arrangement);
+        return child;
+    }
+
+    Solution* mutate() {
+        int randomQueen = rand() % (chessBoardSize);
+        int randomPosition = rand() % (chessBoardSize) + 1;
+        arrangement[randomQueen] = '0' + randomPosition;
+        cost = fitnessValue(arrangement);
+        return this;
+    }
+};
+
+typedef vector<Solution*> population_type;
+
+population_type population;
+int chessBoardSize;
+int initialPopulationCount;
+int mutationRate; // 20% mutation rate
+int populationSize; // 20 individuals in the population
+
+int fitnessValue(string arrangement)
+{
+    int fitness = (chessBoardSize * (chessBoardSize - 1)) / 2;
+    for (int i = 0; i < chessBoardSize; i++) {
+        for (int j = i + 1; j < chessBoardSize; j++) {
+            if ((arrangement[i] == arrangement[j]) || abs(i-j)==abs(arrangement[i]-arrangement[j])) {
+                fitness--;
+            }
+        }
+    }
+    return fitness;
+}
+
+void generatePopulation()
+{
+    string sampleArrangement = "";
+    Solution* temp;
+    for (int i = 1; i <= chessBoardSize; i++) {
+        sampleArrangement += char(int('0')+i);
+    }
+
+    for (int i = 0; i < populationSize; i++) {
+        random_shuffle(sampleArrangement.begin(), sampleArrangement.end());
+        temp = new Solution(sampleArrangement);
+        population.push_back(temp);
+    }
+}
+
+// Select the top half individuals based on the fitness score
+int selectTopHalf() {
+    int n = populationSize/2;
+    int i = 0;
+    int j = 0;
+    int sum = 0;
+    while (i < populationSize && j < n) {
+        sum += population[i]->fitScore;
+        i += 2;
+        j++;
+    }
+    return sum;
+}
+
+// Roulette wheel selection based on the fitness score
+int rouletteWheelSelection(int totalfitScores)
+{
+    int randomPos = rand() % totalfitScores;
+    int sum = 0;
+    for (int i = 0; i < populationSize; i++) {
+        sum += population[i]->fitScore;
+        if (sum > randomPos) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+bool isFit(Solution* test)
+{
+    return test->cost == ((chessBoardSize * (chessBoardSize - 1)) / 2);
+}
+
+bool comp(Solution* a, Solution* b)
+{
+    return a->cost > b->cost;
+}
+
+// Genetic Algorithm 
+Solution* GA(int chessBoardSize, int mutationRate, int populationSize)
+{
+    int randomNum1, randomNum2;
+    Solution* individualX, * individualY, * child;
+
+// Generate initial population
+generatePopulation();
+// Evolve population for a certain number of generations
+for (int i = 0; i < 100; i++) {
+    // Calculate fitness scores of individuals in the population
+    int totalfitScores = 0;
+    for (int j = 0; j < populationSize; j++) {
+        population[j]->fitScore = population[j]->cost;
+        totalfitScores += population[j]->fitScore;
+    }
+
+    // Sort the population based on their fitness scores
+    sort(population.begin(), population.end(), comp);
+
+    // Check if any individual in the population is fit
+    for (int j = 0; j < populationSize; j++) {
+        if (isFit(population[j])) {
+            return population[j];
+        }
+    }
+
+    // Reproduce to create a new population
+    population_type newPopulation;
+    newPopulation.push_back(population[0]);
+    newPopulation.push_back(population[1]);
+    while (newPopulation.size() < populationSize) {
+        randomNum1 = rouletteWheelSelection(selectTopHalf());
+        randomNum2 = rouletteWheelSelection(selectTopHalf());
+        individualX = population[randomNum1];
+        individualY = population[randomNum2];
+
+        // Reproduce with a probability of 80%
+        if (rand() % 100 <= 80) {
+            child = individualX->reproduce(individualY);
+        }
+        // Otherwise, mutate with a probability of 20%
+        else {
+            child = individualX->mutate();
+        }
+        newPopulation.push_back(child);
+    }
+    population = newPopulation;
+}
+
+// Return the individual with the highest fitness score after all generations
+sort(population.begin(), population.end(), comp);
+return population[0];
+}
+
+int main() {
+    srand(time(0));
+
+
+    cout << "Enter the size of chess board (minimum 5, maximum 100): ";
+    cin >> chessBoardSize;
+
+    if (chessBoardSize < 5 || chessBoardSize > 100) {
+        cout << "Invalid board size. Please enter a board size between 5 and 100." << endl;
+        return 0;
+    }
+
+    cout << "Enter the mutation rate as a percentage (e.g., 20): ";
+    cin >> mutationRate;
+
+    cout << "Enter the population size: ";
+    cin >> populationSize;
+
+    generatePopulation();
+
+    int generationCount = 0;
+    //  int randomNum1, randomNum2;
+    //   int individualX, individualY;
+    int randomNum1, randomNum2;
+    Solution* individualX, * individualY, * child;
+        Solution* solution = GA(chessBoardSize, mutationRate, populationSize);
+
+    while (true) {
+        // Evaluate the fitness of each individual in the population
+        for (int i = 0; i < populationSize; i++) {
+            population[i]->fitScore = population[i]->cost;
+        }
+
+        // Sort the population in decreasing order of fitness
+        sort(population.begin(), population.end(), comp);
+
+        // Check if any of the individuals is a solution
+        for (int i = 0; i < populationSize; i++) {
+            if (isFit(population[i])) {
+                cout << "Found solution in generation " << generationCount << ": " << population[i]->arrangement << endl;
+                return 0;
+            }
+        }
+
+        // Create a new population
+        population_type newPopulation;
+        int totalfitScores = selectTopHalf();
+
+        // Keep the top half of the individuals and reproduce using crossover
+        for (int i = 0; i < populationSize / 2; i++) {
+            randomNum1 = rouletteWheelSelection(totalfitScores);
+            individualX = population[randomNum1];
+            randomNum2 = rouletteWheelSelection(totalfitScores);
+            individualY = population[randomNum2];
+            child = individualX->reproduce(individualY);
+            newPopulation.push_back(child);
+        }
+
+        // Mutate the individuals
+        for (int i = 0; i < populationSize; i++) {
+            int random = rand() % 100;
+            if (random < mutationRate) {
+                population[i]->mutate();
+            }
+            newPopulation.push_back(population[i]);
+        }
+
+        population = newPopulation;
+        generationCount++;
+    }
+
+    return 0;
+}
